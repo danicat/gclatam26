@@ -34,6 +34,7 @@ var (
 
 type App struct {
 	model            *game.Model
+	sprites          spriteAssets
 	particles        *ParticleSystem
 	audio            *soundSystem
 	audioAttempted   bool
@@ -49,6 +50,9 @@ type App struct {
 
 func New() *App {
 	a := &App{model: game.NewModel(), particles: NewParticleSystem(128)}
+	if sprites, err := loadEmbeddedAssets(); err == nil {
+		a.sprites = sprites
+	}
 	a.updateHUD()
 	a.lastPhase = a.model.Phase
 	a.lastScene = a.model.Scene
@@ -158,14 +162,22 @@ func (a *App) drawPlayfield(screen *ebiten.Image) {
 	}
 	for _, bug := range a.model.Bugs {
 		if bug.Alive {
-			vector.DrawFilledCircle(screen, float32(bug.Position.X), float32(bug.Position.Y), float32(bug.Radius), colorBug, false)
+			if a.sprites.bug != nil {
+				drawSprite(screen, a.sprites.bug, bug.Position, 15)
+			} else {
+				vector.DrawFilledCircle(screen, float32(bug.Position.X), float32(bug.Position.Y), float32(bug.Radius), colorBug, false)
+			}
 		}
 	}
 	playerColor := colorCalm
 	if a.model.Phase == game.PhasePanic {
 		playerColor = colorPanic
 	}
-	vector.DrawFilledCircle(screen, float32(a.model.Player.Position.X), float32(a.model.Player.Position.Y), float32(a.model.Player.Radius), playerColor, false)
+	if a.sprites.gopher != nil {
+		drawSprite(screen, a.sprites.gopher, a.model.Player.Position, 18)
+	} else {
+		vector.DrawFilledCircle(screen, float32(a.model.Player.Position.X), float32(a.model.Player.Position.Y), float32(a.model.Player.Radius), playerColor, false)
+	}
 	if a.particles != nil {
 		a.particles.Draw(screen)
 	}
@@ -239,7 +251,7 @@ func (a *App) ensureAudio() {
 		return
 	}
 	a.audioAttempted = true
-	system, err := newSoundSystem()
+	system, err := newSoundSystem(a.sprites)
 	if err == nil {
 		a.audio = system
 	}

@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/hajimehoshi/ebiten/v2/audio"
+	"github.com/hajimehoshi/ebiten/v2/audio/mp3"
 
 	"panic-recover/internal/game"
 	"panic-recover/internal/sound"
@@ -22,9 +23,10 @@ var gameplayEffects = [...]sound.Effect{
 
 type soundSystem struct {
 	players [len(gameplayEffects)]*audio.Player
+	bgm     *audio.Player
 }
 
-func newSoundSystem() (*soundSystem, error) {
+func newSoundSystem(assets spriteAssets) (*soundSystem, error) {
 	context := audio.NewContext(sound.SampleRate)
 	system := &soundSystem{}
 	for i, effect := range gameplayEffects {
@@ -33,6 +35,17 @@ func newSoundSystem() (*soundSystem, error) {
 			return nil, fmt.Errorf("create %s player: %w", effect, err)
 		}
 		system.players[i] = player
+	}
+	if len(assets.music) > 0 {
+		stream, err := mp3.Decode(context, bytes.NewReader(assets.music))
+		if err == nil {
+			loop := audio.NewInfiniteLoop(stream, stream.Length())
+			if player, playerErr := context.NewPlayer(loop); playerErr == nil {
+				player.SetVolume(0.32)
+				system.bgm = player
+				player.Play()
+			}
+		}
 	}
 	return system, nil
 }
