@@ -1,0 +1,181 @@
+package app
+
+import (
+	"image/color"
+	"math"
+	"strconv"
+	"time"
+
+	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/hajimehoshi/ebiten/v2/inpututil"
+	"github.com/hajimehoshi/ebiten/v2/text"
+	"github.com/hajimehoshi/ebiten/v2/vector"
+	"golang.org/x/image/font/basicfont"
+
+	"panic-recover/internal/game"
+)
+
+const (
+	windowWidth  = 960
+	windowHeight = 540
+	fixedDT      = time.Second / 60
+)
+
+var (
+	colorBackground = color.RGBA{R: 10, G: 12, B: 24, A: 255}
+	colorGrid       = color.RGBA{R: 25, G: 31, B: 53, A: 255}
+	colorText       = color.RGBA{R: 220, G: 238, B: 228, A: 255}
+	colorCalm       = color.RGBA{R: 72, G: 224, B: 126, A: 255}
+	colorPanic      = color.RGBA{R: 244, G: 72, B: 82, A: 255}
+	colorRecover    = color.RGBA{R: 62, G: 220, B: 244, A: 255}
+	colorBug        = color.RGBA{R: 238, G: 76, B: 190, A: 255}
+)
+
+type App struct {
+	model     *game.Model
+	frameTime float64
+	cycleText string
+	bugsText  string
+	stateText string
+}
+
+func New() *App {
+	a := &App{model: game.NewModel()}
+	a.updateHUD()
+	return a
+}
+
+func (a *App) Layout(_, _ int) (int, int) {
+	return game.VirtualWidth, game.VirtualHeight
+}
+
+func (a *App) Update() error {
+	if ebiten.IsKeyPressed(ebiten.KeyEscape) {
+		return ebiten.Termination
+	}
+
+	input := game.Input{
+		Move: game.Vec2{
+			X: axis(ebiten.KeyD, ebiten.KeyRight) - axis(ebiten.KeyA, ebiten.KeyLeft),
+			Y: axis(ebiten.KeyS, ebiten.KeyDown) - axis(ebiten.KeyW, ebiten.KeyUp),
+		},
+		PanicPressed:   inpututil.IsKeyJustPressed(ebiten.KeySpace),
+		StartPressed:   inpututil.IsKeyJustPressed(ebiten.KeyEnter) || inpututil.IsKeyJustPressed(ebiten.KeySpace),
+		RestartPressed: inpututil.IsKeyJustPressed(ebiten.KeyR),
+	}
+	a.model.Update(input, fixedDT)
+	a.frameTime += fixedDT.Seconds()
+	a.updateHUD()
+	return nil
+}
+
+func axis(positive, negative ebiten.Key) float64 {
+	var result float64
+	if ebiten.IsKeyPressed(positive) {
+		result++
+	}
+	if ebiten.IsKeyPressed(negative) {
+		result--
+	}
+	return result
+}
+
+func (a *App) updateHUD() {
+	a.cycleText = "CYCLE " + strconv.Itoa(a.model.Cycle+1) + "/" + strconv.Itoa(len(a.model.Config.Cycles))
+	quota := 0
+	if a.model.Scene == game.ScenePlaying && a.model.Cycle < len(a.model.Config.Cycles) {
+		quota = a.model.Config.Cycles[a.model.Cycle].Quota
+	}
+	a.bugsText = "BUGS " + strconv.Itoa(a.model.Eliminations) + "/" + strconv.Itoa(quota)
+	switch a.model.Scene {
+	case game.SceneTitle:
+		a.stateText = "PRESS ENTER TO START"
+	case game.SceneVictory:
+		a.stateText = "RECOVER SUCCESSFUL — PRESS R"
+	case game.SceneGameOver:
+		a.stateText = "STABILITY EXHAUSTED — PRESS R"
+	default:
+		switch a.model.Phase {
+		case game.PhaseCalm:
+			a.stateText = "CALM"
+		case game.PhasePanic:
+			a.stateText = "PANIC"
+		case game.PhaseRecoverAvailable:
+			a.stateText = "RECOVER()"
+		}
+	}
+}
+
+func (a *App) Draw(screen *ebiten.Image) {
+	screen.Fill(colorBackground)
+	a.drawGrid(screen)
+
+	switch a.model.Scene {
+	case game.SceneTitle:
+		a.drawTitle(screen)
+	case game.ScenePlaying:
+		a.drawPlayfield(screen)
+	case game.SceneVictory, game.SceneGameOver:
+		a.drawPlayfield(screen)
+		a.drawResult(screen)
+	}
+}
+
+func (a *App) drawGrid(screen *ebiten.Image) {
+	for x := 0; x <= game.VirtualWidth; x += 16 {
+		vector.StrokeLine(screen, float32(x), 0, float32(x), game.VirtualHeight, 1, colorGrid, false)
+	}
+	for y := 0; y <= game.VirtualHeight; y += 16 {
+		vector.StrokeLine(screen, 0, float32(y), game.VirtualWidth, float32(y), 1, colorGrid, false)
+	}
+}
+
+func (a *App) drawTitle(screen *ebiten.Image) {
+	text.Draw(screen, "PANIC RECOVER", basicfont.Face7x13, 106, 58, colorCalm)
+	text.Draw(screen, "MOVE: WASD / ARROWS", basicfont.Face7x13, 90, 91, colorText)
+	text.Draw(screen, "PANIC: SPACE — DESTROY BUGS", basicfont.Face7x13, 90, 106, colorPanic)
+	text.Draw(screen, "REACH RECOVER BEFORE STABILITY HITS ZERO", basicfont.Face7x13, 53, 121, colorRecover)
+	text.Draw(screen, a.stateText, basicfont.Face7x13, 111, 151, colorText)
+}
+
+func (a *App) drawPlayfield(screen *ebiten.Image) {
+	if a.model.Recover.Active {
+		pulse := float32(1 + 0.2*math.Sin(a.frameTime*8))
+		vector.DrawFilledCircle(screen, float32(a.model.Recover.Position.X), float32(a.model.Recover.Position.Y), float32(a.model.Recover.Radius)*pulse, colorRecover, false)
+	}
+	for _, bug := range a.model.Bugs {
+		if bug.Alive {
+			vector.DrawFilledCircle(screen, float32(bug.Position.X), float32(bug.Position.Y), float32(bug.Radius), colorBug, false)
+		}
+	}
+	playerColor := colorCalm
+	if a.model.Phase == game.PhasePanic {
+		playerColor = colorPanic
+	}
+	vector.DrawFilledCircle(screen, float32(a.model.Player.Position.X), float32(a.model.Player.Position.Y), float32(a.model.Player.Radius), playerColor, false)
+	text.Draw(screen, a.cycleText, basicfont.Face7x13, 8, 14, colorText)
+	text.Draw(screen, a.bugsText, basicfont.Face7x13, 252, 14, colorText)
+	a.drawStability(screen)
+	text.Draw(screen, a.stateText, basicfont.Face7x13, 8, 174, playerColor)
+}
+
+func (a *App) drawStability(screen *ebiten.Image) {
+	const barWidth = 90
+	vector.DrawFilledRect(screen, 115, 7, barWidth, 6, colorGrid, false)
+	fraction := float32(0)
+	if a.model.Phase == game.PhasePanic || a.model.Phase == game.PhaseRecoverAvailable {
+		fraction = float32(a.model.PanicRemaining.Seconds() / a.model.Config.PanicDuration.Seconds())
+	}
+	if fraction > 0 {
+		vector.DrawFilledRect(screen, 115, 7, barWidth*fraction, 6, colorPanic, false)
+	}
+}
+
+func (a *App) drawResult(screen *ebiten.Image) {
+	resultColor := colorPanic
+	if a.model.Scene == game.SceneVictory {
+		resultColor = colorRecover
+	}
+	vector.DrawFilledRect(screen, 58, 65, 204, 49, colorBackground, false)
+	text.Draw(screen, a.stateText, basicfont.Face7x13, 71, 93, resultColor)
+}
