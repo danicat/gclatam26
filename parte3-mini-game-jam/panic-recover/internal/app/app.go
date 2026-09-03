@@ -13,6 +13,7 @@ import (
 	"golang.org/x/image/font/basicfont"
 
 	"panic-recover/internal/game"
+	"panic-recover/internal/sound"
 )
 
 const (
@@ -32,16 +33,26 @@ var (
 )
 
 type App struct {
-	model     *game.Model
-	frameTime float64
-	cycleText string
-	bugsText  string
-	stateText string
+	model            *game.Model
+	particles        *ParticleSystem
+	audio            *soundSystem
+	audioAttempted   bool
+	frameTime        float64
+	cycleText        string
+	bugsText         string
+	stateText        string
+	lastPhase        game.Phase
+	lastScene        game.Scene
+	lastCycle        int
+	lastEliminations int
 }
 
 func New() *App {
-	a := &App{model: game.NewModel()}
+	a := &App{model: game.NewModel(), particles: NewParticleSystem(128)}
 	a.updateHUD()
+	a.lastPhase = a.model.Phase
+	a.lastScene = a.model.Scene
+	a.lastCycle = a.model.Cycle
 	return a
 }
 
@@ -65,6 +76,8 @@ func (a *App) Update() error {
 	}
 	a.model.Update(input, fixedDT)
 	a.frameTime += fixedDT.Seconds()
+	a.updateAudio()
+	a.updateParticles()
 	a.updateHUD()
 	return nil
 }
@@ -153,10 +166,90 @@ func (a *App) drawPlayfield(screen *ebiten.Image) {
 		playerColor = colorPanic
 	}
 	vector.DrawFilledCircle(screen, float32(a.model.Player.Position.X), float32(a.model.Player.Position.Y), float32(a.model.Player.Radius), playerColor, false)
+	if a.particles != nil {
+		a.particles.Draw(screen)
+	}
 	text.Draw(screen, a.cycleText, basicfont.Face7x13, 8, 14, colorText)
 	text.Draw(screen, a.bugsText, basicfont.Face7x13, 252, 14, colorText)
 	a.drawStability(screen)
 	text.Draw(screen, a.stateText, basicfont.Face7x13, 8, 174, playerColor)
+}
+
+func (a *App) updateParticles() {
+	if a.particles == nil {
+		return
+	}
+	a.particles.Update(fixedDT.Seconds())
+	if a.model.Phase != a.lastPhase {
+		particleColor := colorCalm
+		if a.model.Phase == game.PhasePanic {
+			particleColor = colorPanic
+		} else if a.model.Phase == game.PhaseRecoverAvailable {
+			particleColor = colorRecover
+		}
+		a.spawnBurst(a.model.Player.Position, particleColor, 12, 16)
+	}
+	if a.model.Eliminations > a.lastEliminations {
+		a.spawnBurst(a.model.Player.Position, colorRecover, 8, 12)
+	}
+	if a.model.Scene != a.lastScene {
+		if a.model.Scene == game.SceneVictory {
+			a.spawnBurst(a.model.Player.Position, colorRecover, 20, 22)
+		} else if a.model.Scene == game.SceneGameOver {
+			a.spawnBurst(a.model.Player.Position, colorPanic, 20, 22)
+		}
+	}
+	a.lastPhase = a.model.Phase
+	a.lastScene = a.model.Scene
+	a.lastCycle = a.model.Cycle
+	a.lastEliminations = a.model.Eliminations
+}
+
+func (a *App) updateAudio() {
+	phaseChanged := a.model.Phase != a.lastPhase
+	sceneChanged := a.model.Scene != a.lastScene
+	if phaseChanged || sceneChanged || a.model.Eliminations > a.lastEliminations {
+		a.ensureAudio()
+	}
+	if a.audio == nil {
+		return
+	}
+	if phaseChanged && a.model.Phase == game.PhasePanic {
+		forced := a.model.PanicRemaining < a.model.Config.PanicDuration
+		_ = a.audio.play(effectForPanicTransition(forced))
+	}
+	if a.model.Eliminations > a.lastEliminations {
+		_ = a.audio.play(sound.EffectElimination)
+	}
+	if phaseChanged && a.model.Phase == game.PhaseRecoverAvailable {
+		_ = a.audio.play(sound.EffectRecover)
+	}
+	if sceneChanged {
+		switch a.model.Scene {
+		case game.SceneVictory:
+			_ = a.audio.play(sound.EffectVictory)
+		case game.SceneGameOver:
+			_ = a.audio.play(sound.EffectGameOver)
+		}
+	}
+}
+
+func (a *App) ensureAudio() {
+	if a.audioAttempted {
+		return
+	}
+	a.audioAttempted = true
+	system, err := newSoundSystem()
+	if err == nil {
+		a.audio = system
+	}
+}
+
+func (a *App) spawnBurst(position game.Vec2, particleColor color.RGBA, count int, speed float64) {
+	for i := 0; i < count; i++ {
+		angle := float64(i) * 2 * math.Pi / float64(count)
+		a.particles.Spawn(position, game.Vec2{X: math.Cos(angle) * speed, Y: math.Sin(angle) * speed}, 0.45, particleColor)
+	}
 }
 
 func (a *App) drawStability(screen *ebiten.Image) {
