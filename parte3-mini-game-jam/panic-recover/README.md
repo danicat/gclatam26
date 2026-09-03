@@ -1,4 +1,4 @@
-# Panic Recover
+# Neon Breather
 
 Um arcade top-down sobre transformar um `panic()` em uma recuperação de emergência.
 

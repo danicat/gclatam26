@@ -148,7 +148,7 @@ func (a *App) drawGrid(screen *ebiten.Image) {
 }
 
 func (a *App) drawTitle(screen *ebiten.Image) {
-	text.Draw(screen, "PANIC RECOVER", basicfont.Face7x13, 106, 58, colorCalm)
+	text.Draw(screen, "NEON BREATHER", basicfont.Face7x13, 106, 58, colorCalm)
 	text.Draw(screen, "MOVE: WASD / ARROWS", basicfont.Face7x13, 90, 91, colorText)
 	text.Draw(screen, "PANIC: SPACE — DESTROY BUGS", basicfont.Face7x13, 90, 106, colorPanic)
 	text.Draw(screen, "REACH RECOVER BEFORE STABILITY HITS ZERO", basicfont.Face7x13, 53, 121, colorRecover)

@@ -1,4 +1,4 @@
-# Panic Recover — Game Design Document
+# Neon Breather — Game Design Document
 
 > **Genre:** Arcade de arena top-down 2D  
 > **Platform:** Desktop (Windows, macOS e Linux)  
