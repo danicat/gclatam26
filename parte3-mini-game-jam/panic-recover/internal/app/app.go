@@ -174,7 +174,11 @@ func (a *App) drawPlayfield(screen *ebiten.Image) {
 		playerColor = colorPanic
 	}
 	if a.sprites.gopher != nil {
-		drawSprite(screen, a.sprites.gopher, a.model.Player.Position, 18)
+		if a.model.Phase == game.PhasePanic {
+			drawSpriteWithTint(screen, a.sprites.gopher, a.model.Player.Position, 18, color.RGBA{R: 255, G: 96, B: 96, A: 255})
+		} else {
+			drawSprite(screen, a.sprites.gopher, a.model.Player.Position, 18)
+		}
 	} else {
 		vector.DrawFilledCircle(screen, float32(a.model.Player.Position.X), float32(a.model.Player.Position.Y), float32(a.model.Player.Radius), playerColor, false)
 	}

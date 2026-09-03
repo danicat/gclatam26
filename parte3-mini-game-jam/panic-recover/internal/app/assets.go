@@ -4,6 +4,7 @@ import (
 	"embed"
 	"fmt"
 	"image"
+	"image/color"
 	_ "image/png"
 
 	"github.com/hajimehoshi/ebiten/v2"
@@ -50,6 +51,10 @@ func decodeEmbeddedImage(name string) (*ebiten.Image, error) {
 }
 
 func drawSprite(screen, sprite *ebiten.Image, position game.Vec2, diameter float64) {
+	drawSpriteWithTint(screen, sprite, position, diameter, color.White)
+}
+
+func drawSpriteWithTint(screen, sprite *ebiten.Image, position game.Vec2, diameter float64, tint color.Color) {
 	if sprite == nil {
 		return
 	}
@@ -58,6 +63,7 @@ func drawSprite(screen, sprite *ebiten.Image, position game.Vec2, diameter float
 	height := float64(bounds.Dy())
 	options := &ebiten.DrawImageOptions{}
 	options.Filter = ebiten.FilterNearest
+	options.ColorScale.ScaleWithColor(tint)
 	options.GeoM.Scale(diameter/width, diameter/height)
 	options.GeoM.Translate(position.X-diameter/2, position.Y-diameter/2)
 	screen.DrawImage(sprite, options)
