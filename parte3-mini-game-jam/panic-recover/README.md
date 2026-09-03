@@ -4,6 +4,14 @@
   <img src="assets/promo_banner.jpg" alt="Panic!!! (& recover?) Promo Banner" width="100%">
 </p>
 
+<p align="center">
+  <a href="https://pg06.github.io/gclatam26/" target="_blank">
+    <img src="https://img.shields.io/badge/▶_JOGAR_ONLINE-GitHub_Pages-00e5ff?style=for-the-badge&logo=googlechrome&logoColor=black" alt="Jogar Online">
+  </a>
+</p>
+
+**🎮 Jogue Online no Navegador**: 👉 **[https://pg06.github.io/gclatam26/](https://pg06.github.io/gclatam26/)**
+
 **Tema da Jam**: *Panic!!! (& recover?)*  
 **Evento**: GopherCon LATAM 2026 - Mini Game Jam  
 **Autores**: Equipe Panic Recover  

@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Panic!!! (& recover?) - Play Online | GopherCon LATAM 2026</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🚨</text></svg>">
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      background-color: #080a10;
+      color: #eceff1;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Courier New", monospace;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      overflow-x: hidden;
+    }
+    header {
+      width: 100%;
+      max-width: 1000px;
+      padding: 12px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid #263248;
+      background: rgba(16, 22, 34, 0.85);
+      backdrop-filter: blur(8px);
+    }
+    .logo {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: #00e5ff;
+      letter-spacing: 1px;
+    }
+    .logo span {
+      color: #ff3d00;
+    }
+    .links a {
+      color: #82a7d2;
+      text-decoration: none;
+      font-size: 0.9rem;
+      margin-left: 15px;
+      transition: color 0.2s;
+    }
+    .links a:hover {
+      color: #00e5ff;
+    }
+    #game-container {
+      width: 100%;
+      max-width: 1000px;
+      margin: 16px auto;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      position: relative;
+    }
+    #canvas-wrapper {
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      background: #000;
+      border: 2px solid #263248;
+      border-radius: 6px;
+      box-shadow: 0 8px 32px rgba(0, 229, 255, 0.15), 0 0 15px rgba(0, 0, 0, 0.8);
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    canvas {
+      width: 100% !important;
+      height: 100% !important;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+      outline: none;
+    }
+    #loading-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(8, 10, 16, 0.95);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 20;
+    }
+    .spinner {
+      width: 48px;
+      height: 48px;
+      border: 4px solid #263248;
+      border-top-color: #00e5ff;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-bottom: 16px;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    #audio-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(8, 10, 16, 0.85);
+      backdrop-filter: blur(4px);
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 10;
+      cursor: pointer;
+    }
+    .btn-start {
+      background: linear-gradient(135deg, #00e5ff, #00b0ff);
+      color: #080a10;
+      font-size: 1.1rem;
+      font-weight: 700;
+      padding: 14px 28px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      box-shadow: 0 4px 20px rgba(0, 229, 255, 0.4);
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+    .btn-start:hover {
+      transform: scale(1.05);
+      box-shadow: 0 6px 26px rgba(0, 229, 255, 0.6);
+    }
+    .instructions-card {
+      width: 100%;
+      max-width: 1000px;
+      margin: 10px 0 30px 0;
+      background: #101622;
+      border: 1px solid #263248;
+      border-radius: 6px;
+      padding: 16px 24px;
+    }
+    .instructions-card h3 {
+      color: #ffd54f;
+      font-size: 1.05rem;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .controls-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 12px;
+      font-size: 0.88rem;
+    }
+    .key-badge {
+      background: #1e293b;
+      color: #00e5ff;
+      padding: 3px 7px;
+      border-radius: 3px;
+      font-family: monospace;
+      font-weight: bold;
+      border: 1px solid #384964;
+    }
+    footer {
+      margin-top: auto;
+      padding: 14px;
+      font-size: 0.82rem;
+      color: #78909c;
+      text-align: center;
+    }
+  </style>
+  <script src="wasm_exec.js"></script>
+</head>
+<body>
+
+  <header>
+    <div class="logo">PANIC<span>!!!</span> (& recover?)</div>
+    <div class="links">
+      <a href="https://github.com/danicat/gclatam26/pull/1" target="_blank">Pull Request #1</a>
+      <a href="https://github.com/pg06/gclatam26" target="_blank">GitHub Repo</a>
+    </div>
+  </header>
+
+  <main id="game-container">
+    <div id="canvas-wrapper">
+      <div id="loading-overlay">
+        <div class="spinner"></div>
+        <p id="loading-text" style="color: #00e5ff; font-weight: bold; letter-spacing: 0.5px;">Loading WebAssembly Game Engine...</p>
+      </div>
+
+      <div id="audio-overlay">
+        <button class="btn-start">▶ CLICK TO START GAME</button>
+        <p style="margin-top: 12px; font-size: 0.85rem; color: #82a7d2;">Clicking unlocks web audio and controls</p>
+      </div>
+    </div>
+
+    <section class="instructions-card">
+      <h3>🕹️ HOW TO PLAY & CONTROLS</h3>
+      <div class="controls-grid">
+        <div><span class="key-badge">▲ / ▼</span> or <span class="key-badge">W / S</span> Select falling code line</div>
+        <div><span class="key-badge">ENTER</span> or <span class="key-badge">SPACE</span> Edit line / Submit patch</div>
+        <div><span class="key-badge">ESC</span> Cancel inline editing</div>
+        <div><span class="key-badge">H</span> Toggle Diagnostic Hint</div>
+        <div><span class="key-badge">M</span> Toggle Sound Mute</div>
+        <div><span class="key-badge">F11</span> Toggle Fullscreen Mode</div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    GopherCon LATAM 2026 Mini Game Jam • Built in Go with Ebitengine v2 & Antigravity
+  </footer>
+
+  <script>
+    // Polyfill instantiateStreaming for older browsers
+    if (!WebAssembly.instantiateStreaming) {
+      WebAssembly.instantiateStreaming = async (resp, importObject) => {
+        const source = await (await resp).arrayBuffer();
+        return await WebAssembly.instantiate(source, importObject);
+      };
+    }
+
+    const go = new Go();
+    const loadingOverlay = document.getElementById("loading-overlay");
+    const audioOverlay = document.getElementById("audio-overlay");
+
+    // Fetch and instantiate WebAssembly binary
+    WebAssembly.instantiateStreaming(fetch("game.wasm"), go.importObject)
+      .then((result) => {
+        loadingOverlay.style.display = "none";
+        audioOverlay.style.display = "flex";
+
+        audioOverlay.addEventListener("click", () => {
+          audioOverlay.style.display = "none";
+          // Focus canvas
+          const canvas = document.querySelector("canvas");
+          if (canvas) canvas.focus();
+        });
+
+        // Run Ebitengine WASM game
+        go.run(result.instance);
+      })
+      .catch((err) => {
+        console.error("WebAssembly initialization failed:", err);
+        const loadingText = document.getElementById("loading-text");
+        loadingText.style.color = "#ff3d00";
+        loadingText.innerText = "Error loading WebAssembly: " + err;
+      });
+  </script>
+</body>
+</html>
