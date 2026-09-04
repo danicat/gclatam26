@@ -1,0 +1,3 @@
+# WebAssembly and native binaries
+*.wasm
+panic-recover-bin
